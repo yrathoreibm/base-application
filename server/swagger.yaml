@@ -1,0 +1,641 @@
+openapi: 3.0.3
+
+# ---------------------------------------------------------------------------
+# Base Application API — OpenAPI 3.0 Specification
+# ---------------------------------------------------------------------------
+# This file documents:
+#   1. REST endpoint  — GET  /health
+#   2. GraphQL endpoint — POST /graphql  (all queries & mutations)
+#
+# Run locally:
+#   npx @redocly/cli preview-docs swagger.yaml
+# Or paste into: https://editor.swagger.io
+# ---------------------------------------------------------------------------
+
+info:
+  title: Base Application API
+  version: 1.0.0
+  description: |
+    **Base Application** back-end — Node.js + Express + Apollo Server 4 + GraphQL.
+
+    The server exposes:
+    - A lightweight **REST health-check** (`GET /health`)
+    - A **GraphQL endpoint** (`POST /graphql`) for all data operations
+
+    ### Authentication
+    Currently no authentication is required (development mode).
+    Add an `Authorization: Bearer <token>` header for production deployments.
+
+    ### Base URL
+    `http://127.0.0.1:4000`
+  contact:
+    name: Base Application Team
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://127.0.0.1:4000
+    description: Local development server
+
+tags:
+  - name: Health
+    description: Service liveness check
+  - name: GraphQL — Queries
+    description: Read-only GraphQL operations
+  - name: GraphQL — Mutations
+    description: Write GraphQL operations (create / update / delete)
+
+# ---------------------------------------------------------------------------
+# PATHS
+# ---------------------------------------------------------------------------
+paths:
+
+  # -------------------------------------------------------------------------
+  # 1. REST — Health Check
+  # -------------------------------------------------------------------------
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Returns the liveness status of the server.
+      operationId: getHealth
+      responses:
+        "200":
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                service: base-application-server
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # -------------------------------------------------------------------------
+  # 2. GraphQL endpoint — one path, multiple logical operations
+  #    Each operation is modelled as a separate POST with a distinct
+  #    operationId so Swagger UI can display them individually.
+  # -------------------------------------------------------------------------
+
+  # ── QUERIES ──────────────────────────────────────────────────────────────
+
+  /graphql#items:
+    post:
+      tags:
+        - GraphQL — Queries
+      summary: "Query: items — list all items"
+      description: |
+        Returns the full list of items in the store.
+
+        **GraphQL query:**
+        ```graphql
+        query {
+          items {
+            id
+            name
+            description
+            status
+            category
+            createdAt
+            updatedAt
+          }
+        }
+        ```
+      operationId: queryItems
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GraphQLRequest"
+            example:
+              query: "{ items { id name description status category createdAt updatedAt } }"
+      responses:
+        "200":
+          description: List of items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemsQueryResponse"
+              example:
+                data:
+                  items:
+                    - id: "1"
+                      name: Sample Item Alpha
+                      description: The first sample item in the base application.
+                      status: active
+                      category: General
+                      createdAt: "2024-01-01T00:00:00.000Z"
+                      updatedAt: "2024-01-01T00:00:00.000Z"
+        "400":
+          $ref: "#/components/responses/GraphQLError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /graphql#item:
+    post:
+      tags:
+        - GraphQL — Queries
+      summary: "Query: item — get item by ID"
+      description: |
+        Returns a single item by its ID, or `null` if not found.
+
+        **GraphQL query:**
+        ```graphql
+        query GetItem($id: ID!) {
+          item(id: $id) {
+            id
+            name
+            description
+            status
+            category
+            createdAt
+            updatedAt
+          }
+        }
+        ```
+      operationId: queryItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GraphQLRequest"
+            example:
+              query: "query GetItem($id: ID!) { item(id: $id) { id name description status category createdAt updatedAt } }"
+              variables:
+                id: "1"
+      responses:
+        "200":
+          description: Single item or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemQueryResponse"
+        "400":
+          $ref: "#/components/responses/GraphQLError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /graphql#stats:
+    post:
+      tags:
+        - GraphQL — Queries
+      summary: "Query: stats — aggregate statistics"
+      description: |
+        Returns aggregate counts across all items.
+
+        **GraphQL query:**
+        ```graphql
+        query {
+          stats {
+            total
+            active
+            pending
+            inactive
+          }
+        }
+        ```
+      operationId: queryStats
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GraphQLRequest"
+            example:
+              query: "{ stats { total active pending inactive } }"
+      responses:
+        "200":
+          description: Statistics object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsQueryResponse"
+              example:
+                data:
+                  stats:
+                    total: 3
+                    active: 1
+                    pending: 1
+                    inactive: 1
+        "400":
+          $ref: "#/components/responses/GraphQLError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── MUTATIONS ────────────────────────────────────────────────────────────
+
+  /graphql#createItem:
+    post:
+      tags:
+        - GraphQL — Mutations
+      summary: "Mutation: createItem — create a new item"
+      description: |
+        Creates a new item and returns the saved entity.
+
+        **GraphQL mutation:**
+        ```graphql
+        mutation CreateItem($input: CreateItemInput!) {
+          createItem(input: $input) {
+            id
+            name
+            description
+            status
+            category
+            createdAt
+            updatedAt
+          }
+        }
+        ```
+
+        **Validation rules:**
+        - `name` — required, max 120 chars
+        - `description` — required, max 500 chars
+        - `category` — required
+        - `status` — must be `pending | active | inactive`
+      operationId: mutationCreateItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GraphQLRequest"
+            example:
+              query: |
+                mutation CreateItem($input: CreateItemInput!) {
+                  createItem(input: $input) {
+                    id name description status category createdAt updatedAt
+                  }
+                }
+              variables:
+                input:
+                  name: My New Item
+                  description: A brand-new item created via the API.
+                  status: pending
+                  category: General
+      responses:
+        "200":
+          description: Newly created item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateItemResponse"
+        "400":
+          $ref: "#/components/responses/GraphQLError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /graphql#updateItem:
+    post:
+      tags:
+        - GraphQL — Mutations
+      summary: "Mutation: updateItem — update an existing item"
+      description: |
+        Partially updates an existing item. All fields in the input are optional.
+        Returns `null` (with a NOT_FOUND error) if the ID does not exist.
+
+        **GraphQL mutation:**
+        ```graphql
+        mutation UpdateItem($id: ID!, $input: UpdateItemInput!) {
+          updateItem(id: $id, input: $input) {
+            id
+            name
+            description
+            status
+            category
+            updatedAt
+          }
+        }
+        ```
+      operationId: mutationUpdateItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GraphQLRequest"
+            example:
+              query: |
+                mutation UpdateItem($id: ID!, $input: UpdateItemInput!) {
+                  updateItem(id: $id, input: $input) {
+                    id name status updatedAt
+                  }
+                }
+              variables:
+                id: "1"
+                input:
+                  status: inactive
+      responses:
+        "200":
+          description: Updated item or GraphQL NOT_FOUND error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateItemResponse"
+        "400":
+          $ref: "#/components/responses/GraphQLError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /graphql#deleteItem:
+    post:
+      tags:
+        - GraphQL — Mutations
+      summary: "Mutation: deleteItem — delete an item"
+      description: |
+        Deletes an item by ID. Returns `true` on success, `false` if not found.
+
+        **GraphQL mutation:**
+        ```graphql
+        mutation DeleteItem($id: ID!) {
+          deleteItem(id: $id)
+        }
+        ```
+      operationId: mutationDeleteItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GraphQLRequest"
+            example:
+              query: "mutation DeleteItem($id: ID!) { deleteItem(id: $id) }"
+              variables:
+                id: "1"
+      responses:
+        "200":
+          description: Deletion result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteItemResponse"
+              example:
+                data:
+                  deleteItem: true
+        "400":
+          $ref: "#/components/responses/GraphQLError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+# ---------------------------------------------------------------------------
+# COMPONENTS
+# ---------------------------------------------------------------------------
+components:
+
+  # ── Schemas ──────────────────────────────────────────────────────────────
+  schemas:
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - service
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: base-application-server
+
+    ItemStatus:
+      type: string
+      enum:
+        - pending
+        - active
+        - inactive
+      description: Lifecycle status of an item.
+
+    Item:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - status
+        - category
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          example: "1"
+        name:
+          type: string
+          maxLength: 120
+          example: Sample Item Alpha
+        description:
+          type: string
+          maxLength: 500
+          example: The first sample item in the base application.
+        status:
+          $ref: "#/components/schemas/ItemStatus"
+        category:
+          type: string
+          example: General
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-01-01T00:00:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-01-01T00:00:00.000Z"
+
+    Stats:
+      type: object
+      required:
+        - total
+        - active
+        - pending
+        - inactive
+      properties:
+        total:
+          type: integer
+          example: 3
+        active:
+          type: integer
+          example: 1
+        pending:
+          type: integer
+          example: 1
+        inactive:
+          type: integer
+          example: 1
+
+    GraphQLRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: GraphQL query or mutation string.
+        variables:
+          type: object
+          additionalProperties: true
+          description: Named variables referenced in the query.
+        operationName:
+          type: string
+          description: Optional — disambiguates when the document has multiple operations.
+
+    GraphQLError:
+      type: object
+      properties:
+        message:
+          type: string
+        locations:
+          type: array
+          items:
+            type: object
+            properties:
+              line:
+                type: integer
+              column:
+                type: integer
+        path:
+          type: array
+          items:
+            type: string
+        extensions:
+          type: object
+          properties:
+            code:
+              type: string
+              example: BAD_USER_INPUT
+
+    # ── Query response envelopes ──────────────────────────────────────────
+
+    ItemsQueryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/Item"
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphQLError"
+
+    ItemQueryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            item:
+              nullable: true
+              allOf:
+                - $ref: "#/components/schemas/Item"
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphQLError"
+
+    StatsQueryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            stats:
+              $ref: "#/components/schemas/Stats"
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphQLError"
+
+    # ── Mutation response envelopes ───────────────────────────────────────
+
+    CreateItemResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            createItem:
+              $ref: "#/components/schemas/Item"
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphQLError"
+
+    UpdateItemResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            updateItem:
+              nullable: true
+              allOf:
+                - $ref: "#/components/schemas/Item"
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphQLError"
+
+    DeleteItemResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            deleteItem:
+              type: boolean
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphQLError"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: An unexpected error occurred.
+            code:
+              type: integer
+              example: 500
+
+  # ── Reusable Responses ───────────────────────────────────────────────────
+  responses:
+
+    GraphQLError:
+      description: GraphQL validation or execution error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              errors:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GraphQLError"
+          example:
+            errors:
+              - message: "id must not be empty."
+                extensions:
+                  code: BAD_USER_INPUT
+
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              message: An unexpected error occurred.
+              code: 500
